@@ -7,6 +7,9 @@ All colors MUST be HSL.
 */
 
 @layer base {
+  html {
+    font-size: 85%;
+  }
   :root {
     /* Modern Dark Theme - Green & Dark Gray Palette */
     /* Core backgrounds */

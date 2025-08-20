@@ -23,14 +23,10 @@ export function Header({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
             <p className="text-sm text-muted-foreground">Sistema de Monitoramento</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center">
           <Badge variant="outline" className="bg-success/10 text-success border-success/30 px-3 py-1">
             <Wifi className="w-3 h-3 mr-2" />
             Online
-          </Badge>
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 px-3 py-1">
-            <Shield className="w-3 h-3 mr-2" />
-            Ativo
           </Badge>
         </div>
       </div>

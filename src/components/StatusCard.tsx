@@ -67,7 +67,7 @@ export function StatusCard({ status, eyesClosedTime, lastAlert }: StatusCardProp
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-6">
             <div className={cn(
-              "w-20 h-20 rounded-full flex items-center justify-center text-white backdrop-blur-sm",
+              "w-20 h-20 aspect-square rounded-full flex items-center justify-center text-white backdrop-blur-sm",
               config.bgClass,
               config.glowClass,
               config.animation

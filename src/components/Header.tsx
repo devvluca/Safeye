@@ -17,7 +17,7 @@ export function Header({ onOpenSidebar }: { onOpenSidebar?: () => void }) {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <img src={safeyeLogo} alt="Safeye Monitor" className="w-14 h-14 object-contain" />
+          <img src={safeyeLogo} alt="Safeye Monitor" className="w-14 h-14 rounded-full aspect-square object-cover bg-background" />
           <div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">Safeye</h1>
             <p className="text-sm text-muted-foreground">Sistema de Monitoramento</p>

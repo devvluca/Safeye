@@ -1,26 +1,28 @@
 #include <WiFi.h>
-#include <PubSubClient.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 // Wi-Fi
 const char* ssid = "NOVA ROMA_ALUNOS";
 const char* password = "Alunos@2025";
 
-// MQTT
-const char* mqtt_server = "10.0.4.74";  // ex: 192.168.1.100
-WiFiClient espClient;
-PubSubClient client(espClient);
+// Supabase
+const char* supabase_url = "https://zdkjudhrftylthtitdzm.supabase.co/rest/v1/telemetria_oculos";
+const char* supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpka2p1ZGhyZnR5bHRodGl0ZHptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNTM0NTksImV4cCI6MjA3MTkyOTQ1OX0.muTwQ2-qvMIY0KvlTIe2Cfh1AYwpXK2WYKuJERjdWjg";
 
 // Pinos
 #define SENSOR_PIN 34   // OUT do sensor IR
-#define BUZZER_PIN 27   // Buzzer
+#define BUZZER_PIN 25   // Buzzer
 #define LED_PIN 26      // LED externo
+#define WIFI_PIN 14     // LED wifi
+#define MQTT_PIN 12     // LED broker
 
 // Estado
 unsigned long tempoFechado = 0;
 bool olhoFechado = false;
 bool alertaAtivo = false;
 unsigned long cicloInicio = 0;
-unsigned long ultimoEnvioMQTT = 0;
+unsigned long ultimoEnvioSupabase = 0;
 
 void setup_wifi() {
   delay(10);
@@ -30,25 +32,48 @@ void setup_wifi() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    digitalWrite(WIFI_PIN, LOW);
   }
 
   Serial.println("");
   Serial.println("Wi-Fi conectado");
+  digitalWrite(WIFI_PIN, HIGH);
   Serial.println(WiFi.localIP());
 }
 
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Tentando conectar ao broker MQTT...");
-    if (client.connect("ESP32_Oculos")) {
-      Serial.println("Conectado ao MQTT");
-      // Se quiser, inscreva-se em algum tópico aqui
-      // client.subscribe("algum/topico/cmd");
+void enviarParaSupabase(bool olhoFechado, int tempoFechado, bool alertaAtivo) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(supabase_url);
+    
+    // Headers necessários para o Supabase
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("apikey", supabase_key);
+    http.addHeader("Authorization", String("Bearer ") + supabase_key);
+    http.addHeader("Prefer", "return=minimal");
+    
+    // Criar JSON usando ArduinoJson
+    DynamicJsonDocument doc(512);
+    doc["olhofechado"] = olhoFechado;
+    doc["tempofechado"] = tempoFechado;
+    doc["alertaativo"] = alertaAtivo;
+    
+    String jsonString;
+    serializeJson(doc, jsonString);
+    
+    // Enviar POST
+    int httpResponseCode = http.POST(jsonString);
+    
+    if (httpResponseCode > 0) {
+      Serial.println("✅ Enviado para Supabase: " + jsonString);
+      Serial.println("Response code: " + String(httpResponseCode));
     } else {
-      Serial.print("Falha, rc=");
-      Serial.print(client.state());
-      delay(2000);
+      Serial.println("❌ Erro ao enviar para Supabase: " + String(httpResponseCode));
     }
+    
+    http.end();
+  } else {
+    Serial.println("❌ WiFi desconectado!");
   }
 }
 
@@ -57,20 +82,19 @@ void setup() {
   pinMode(SENSOR_PIN, INPUT);
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(WIFI_PIN, OUTPUT);
+  pinMode(MQTT_PIN, OUTPUT);
 
   digitalWrite(BUZZER_PIN, LOW);
   digitalWrite(LED_PIN, LOW);
+  digitalWrite(MQTT_PIN, LOW);
+  digitalWrite(MQTT_PIN, LOW);
+
 
   setup_wifi();
-  client.setServer(mqtt_server, 1883);
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
-
   int valor = digitalRead(SENSOR_PIN); // LOW = olho fechado
   unsigned long agora = millis();
 
@@ -107,22 +131,17 @@ void loop() {
     }
   }
 
-  // 🟢 Enviar dados a cada 2s via MQTT
-  if (agora - ultimoEnvioMQTT >= 2000) {
-    ultimoEnvioMQTT = agora;
-
-    // Constrói JSON manualmente
-    String payload = "{";
-    payload += "\"olhoFechado\":";
-    payload += (valor == LOW ? "true" : "false");
-    payload += ",\"tempoFechado\":";
-    payload += (valor == LOW ? String(agora - tempoFechado) : "0");
-    payload += ",\"alertaAtivo\":";
-    payload += (alertaAtivo ? "true" : "false");
-    payload += "}";
-
-    client.publish("devices/oculos1/telemetry", payload.c_str());
-    Serial.println("📡 Publicado no MQTT: " + payload);
+  // 🌐 Enviar dados para Supabase a cada 5 segundos
+  if (agora - ultimoEnvioSupabase >= 5000) {
+    ultimoEnvioSupabase = agora;
+    
+    int tempoAtual = (valor == LOW && olhoFechado) ? agora - tempoFechado : 0;
+    enviarParaSupabase(valor == LOW, tempoAtual, alertaAtivo);
+    
+    // LED MQTT indica envio para Supabase
+    digitalWrite(MQTT_PIN, HIGH);
+    delay(100);
+    digitalWrite(MQTT_PIN, LOW);
   }
 
   delay(50); // estabilidade
